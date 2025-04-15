@@ -9,6 +9,13 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="PWA Tracker Demo" />
     <link rel="apple-touch-icon" href="icon-192x192.png" />
+    <script>
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("./sw.js", {
+          scope: "/pwa-install-tracker/examples/",
+        });
+      }
+    </script>
   </head>
   <body>
     <h1>PWA Install Tracker Demo</h1>
