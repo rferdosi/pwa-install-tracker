@@ -2,7 +2,7 @@
   "name": "PWA Install Tracker Demo",
   "short_name": "PWA Demo",
   "description": "Demo application for PWA Install Tracker",
-  "start_url": "/examples/basic-usage.html",
+  "start_url": "/pwa-install-tracker/examples/basic-usage.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#000000",
