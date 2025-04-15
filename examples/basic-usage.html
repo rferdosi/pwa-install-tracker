@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PWA Install Tracker Example</title>
+    <link rel="manifest" href="manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="PWA Tracker Demo" />
+    <link rel="apple-touch-icon" href="icon-192x192.png" />
+  </head>
+  <body>
+    <h1 id="test"></h1>
+    <h1>PWA Install Tracker Demo</h1>
+    <p>This is a demo of the PWA Install Tracker library.</p>
+    <p>Current URL parameters:</p>
+    <pre id="params"></pre>
+    <p>Required parameters: <span id="required-params">installParams</span></p>
+    <p>Parameters saved: <span id="saved-params">[]</span></p>
+    <p>Installation status: <span id="status">Not installed</span></p>
+
+    <script type="module">
+      // Wait for DOM to be ready
+      document.addEventListener("DOMContentLoaded", async () => {
+        try {
+          // Import the tracker
+          const PWAInstallTracker = (await import("../dist/index.js")).default;
+
+          // Display current URL parameters
+          const params = new URLSearchParams(window.location.search);
+          const paramsText = Array.from(params.entries())
+            .map(([key, value]) => `${key}: ${value}`)
+            .join("\n");
+
+          document.getElementById("params").textContent = paramsText || "None";
+
+          // Initialize the tracker
+          const tracker = new PWAInstallTracker({
+            callbackParams: ["install_callback"],
+            cacheName: "demo_params",
+          });
+
+          // Check if parameters are saved
+          const savedParams = await tracker.getSavedParams();
+          document.getElementById("saved-params").textContent = savedParams;
+
+          // Update installation status
+          const updateStatus = () => {
+            const isStandalone = window.matchMedia(
+              "(display-mode: standalone)"
+            ).matches;
+            document.getElementById("status").textContent = isStandalone
+              ? "Installed as PWA"
+              : "Not installed";
+          };
+
+          // Listen for display mode changes
+          window
+            .matchMedia("(display-mode: standalone)")
+            .addEventListener("change", updateStatus);
+
+          // Initial status check
+          updateStatus();
+        } catch (error) {
+          console.error("Error initializing PWA Install Tracker:", error);
+          document.getElementById("status").textContent =
+            "Error initializing tracker";
+        }
+      });
+    </script>
+  </body>
+</html>
