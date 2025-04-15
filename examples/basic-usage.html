@@ -11,10 +11,10 @@
     <link rel="apple-touch-icon" href="icon-192x192.png" />
   </head>
   <body>
-    <h1 id="test"></h1>
     <h1>PWA Install Tracker Demo</h1>
     <p>This is a demo of the PWA Install Tracker library.</p>
     <p>Current URL parameters:</p>
+    <p id="has-cache-support"></p>
     <pre id="params"></pre>
     <p>Required parameters: <span id="required-params">installParams</span></p>
     <p>Parameters saved: <span id="saved-params">[]</span></p>
@@ -39,6 +39,7 @@
           const tracker = new PWAInstallTracker({
             callbackParams: ["install_callback"],
             cacheName: "demo_params",
+            registerServiceWorker: true,
           });
 
           // Check if parameters are saved
@@ -54,6 +55,9 @@
               ? "Installed as PWA"
               : "Not installed";
           };
+
+          document.getElementById("has-cache-support").textContent =
+            "Cache support: " + ("caches" in window);
 
           // Listen for display mode changes
           window

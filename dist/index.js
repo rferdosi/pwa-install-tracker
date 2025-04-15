@@ -1,28 +1,44 @@
 const FAKE_ENDPOINT = "/fake-endpoint";
+const registerServiceWorker = async () => {
+    if ("serviceWorker" in navigator) {
+        try {
+            const registration = await navigator.serviceWorker.register("./sw.js", {
+                scope: "/",
+            });
+            if (registration.installing) {
+                console.log("Service worker installing");
+            }
+            else if (registration.waiting) {
+                console.log("Service worker installed");
+            }
+            else if (registration.active) {
+                console.log("Service worker active");
+            }
+        }
+        catch (error) {
+            console.error(`Registration failed with ${error}`);
+        }
+    }
+};
 class PWAInstallTracker {
     constructor(options) {
         this.callbackParams = options.callbackParams || [];
         this.cacheName = options.cacheName || "intall-tracker-cache";
         this.isStandalone = window.matchMedia("(display-mode: standalone)").matches;
+        this.registerServiceWorker = options.registerServiceWorker || false;
         this.initialize();
     }
     initialize() {
+        if (this.registerServiceWorker) {
+            registerServiceWorker();
+        }
         // Save query params on initial load if not in standalone mode
         if (!this.isStandalone) {
             this.saveQueryParams();
         }
-        // Check if we're in standalone mode and have saved params
-        if (this.isStandalone) {
+        else {
             this.sendSavedParams();
         }
-        // Listen for display mode changes
-        window
-            .matchMedia("(display-mode: standalone)")
-            .addEventListener("change", (e) => {
-            if (e.matches) {
-                this.sendSavedParams();
-            }
-        });
     }
     async saveQueryParams() {
         const urlParams = new URLSearchParams(window.location.search);
@@ -61,7 +77,7 @@ class PWAInstallTracker {
     }
     async sendSavedParams() {
         try {
-            const savedCallbacks = (await this.getSavedParams()) || [];
+            const savedCallbacks = await this.getSavedParams();
             if (savedCallbacks.length > 0) {
                 const sendPromises = savedCallbacks.map(async (callback) => {
                     return fetch(callback, {
@@ -72,7 +88,7 @@ class PWAInstallTracker {
                     });
                 });
                 const results = await Promise.all(sendPromises);
-                const allSuccessful = results.every((result) => result);
+                const allSuccessful = results.every((result) => result.ok);
                 if (allSuccessful) {
                     // Clear saved params after successful send
                     const cache = await caches.open(this.cacheName);
