@@ -1,18 +1,56 @@
-const FAKE_ENDPOINT = "/fake-endpoint";
+const DB_NAME = "install-tracker-db";
+const STORE_NAME = "callbacks";
+const DB_VERSION = 1;
 class PWAInstallTracker {
     constructor(options) {
+        this.db = null;
+        this.initPromise = null;
         this.callbackParams = options.callbackParams || [];
-        this.cacheName = options.cacheName || "intall-tracker-cache";
+        this.dbName = options.cacheName || DB_NAME;
         this.isStandalone = window.matchMedia("(display-mode: standalone)").matches;
         this.initialize();
     }
-    initialize() {
-        // Save query params on initial load if not in standalone mode
-        if (!this.isStandalone) {
-            this.saveQueryParams();
+    async initialize() {
+        try {
+            await this.initDB();
+            // Save query params on initial load if not in standalone mode
+            if (!this.isStandalone) {
+                await this.saveQueryParams();
+            }
+            else {
+                await this.sendSavedParams();
+            }
         }
-        else {
-            this.sendSavedParams();
+        catch (error) {
+            console.error("Error during initialization:", error);
+        }
+    }
+    initDB() {
+        if (this.initPromise) {
+            return this.initPromise;
+        }
+        this.initPromise = new Promise((resolve, reject) => {
+            const request = indexedDB.open(this.dbName, DB_VERSION);
+            request.onerror = () => {
+                console.error("Error opening database");
+                reject(request.error);
+            };
+            request.onsuccess = () => {
+                this.db = request.result;
+                resolve();
+            };
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                }
+            };
+        });
+        return this.initPromise;
+    }
+    async ensureDB() {
+        if (!this.db) {
+            await this.initDB();
         }
     }
     async saveQueryParams() {
@@ -25,30 +63,52 @@ class PWAInstallTracker {
         });
         if (callbacks.length > 0) {
             try {
-                const cache = await caches.open(this.cacheName);
-                const responseBody = JSON.stringify(callbacks);
-                const response = new Response(responseBody);
-                await cache.put(FAKE_ENDPOINT, response);
+                await this.saveToIndexedDB(callbacks);
             }
             catch (error) {
                 console.error("Error saving callbacks:", error);
             }
         }
     }
+    async saveToIndexedDB(callbacks) {
+        await this.ensureDB();
+        return new Promise((resolve, reject) => {
+            if (!this.db) {
+                reject(new Error("Database not initialized"));
+                return;
+            }
+            const transaction = this.db.transaction([STORE_NAME], "readwrite");
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.put({ id: 'callbacks', values: callbacks });
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    }
     async getSavedParams() {
         try {
-            const cache = await caches.open(this.cacheName);
-            const response = await cache.match(FAKE_ENDPOINT);
-            if (!response) {
-                return [];
-            }
-            const responseBody = await response.json();
-            return responseBody;
+            return await this.getFromIndexedDB();
         }
         catch (error) {
             console.error("Error getting saved params:", error);
             return [];
         }
+    }
+    async getFromIndexedDB() {
+        await this.ensureDB();
+        return new Promise((resolve, reject) => {
+            if (!this.db) {
+                reject(new Error("Database not initialized"));
+                return;
+            }
+            const transaction = this.db.transaction([STORE_NAME], "readonly");
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.get('callbacks');
+            request.onsuccess = () => {
+                const data = request.result;
+                resolve(data ? data.values : []);
+            };
+            request.onerror = () => reject(request.error);
+        });
     }
     async sendSavedParams() {
         try {
@@ -66,14 +126,27 @@ class PWAInstallTracker {
                 const allSuccessful = results.every((result) => result.ok);
                 if (allSuccessful) {
                     // Clear saved params after successful send
-                    const cache = await caches.open(this.cacheName);
-                    await cache.delete(FAKE_ENDPOINT);
+                    await this.clearSavedParams();
                 }
             }
         }
         catch (error) {
             console.error("Error in sendSavedParams:", error);
         }
+    }
+    async clearSavedParams() {
+        await this.ensureDB();
+        return new Promise((resolve, reject) => {
+            if (!this.db) {
+                reject(new Error("Database not initialized"));
+                return;
+            }
+            const transaction = this.db.transaction([STORE_NAME], "readwrite");
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.delete('callbacks');
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
     }
 }
 export default PWAInstallTracker;
